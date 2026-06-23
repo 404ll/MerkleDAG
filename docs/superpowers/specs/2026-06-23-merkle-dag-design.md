@@ -1,38 +1,40 @@
-# Merkle DAG Course Project Design
+# Merkle DAG 课程项目设计文档
 
-## Goal
+## 项目目标
 
-Build a local, simplified Merkle DAG file storage and path resolution system in Go.
+使用 Go 语言实现一个本地运行的简化版 Merkle DAG 文件存储与路径解析系统。
 
-The project should be easy to compile, run, demonstrate, and explain in a course defense. It will implement the required Blob and Tree objects, plus a small List extension for chunked files. The system is not an IPFS clone; it focuses on content addressing, HashLink references, Tree path resolution, and file reading.
+这个项目的重点不是复现完整 IPFS，而是把课程中学习到的内容寻址、CID、HashLink、Tree 路径解析和文件读取流程串起来。最终项目需要能够编译、运行、演示，并且便于在答辩时解释清楚。
 
-## Scope
+本项目会实现必做的 Blob 和 Tree 对象，并加入一个小型 List 扩展，用来表示分块后的大文件。
 
-Required features:
+## 功能范围
 
-- Encode ordinary small files as Blob objects.
-- Encode directories as Tree objects.
-- Generate CID as `hex(SHA256(serializedObject))`.
-- Persist objects under `./data/objects/<cid>.json`.
-- Import files and directories recursively with `mdag add`.
-- Resolve paths from a root CID with `mdag resolve`.
-- Read file content with `mdag cat`.
-- Report clear errors for missing CID, missing path component, non-Tree path traversal, non-file cat target, and decode failures.
+必做功能：
 
-Extension features:
+- 将普通小文件编码为 Blob 对象。
+- 将目录编码为 Tree 对象。
+- 使用 `hex(SHA256(serializedObject))` 作为 CID。
+- 将对象持久化保存到 `./data/objects/<cid>.json`。
+- 使用 `mdag add` 递归导入文件或目录。
+- 使用 `mdag resolve` 从根 CID 和路径解析目标对象。
+- 使用 `mdag cat` 读取目标文件内容。
+- 对 CID 不存在、路径不存在、路径中途遇到非 Tree 对象、cat 目标不是文件、对象反序列化失败等情况给出明确错误。
 
-- Encode files larger than 1024 bytes as List objects containing ordered Blob chunks.
-- Read List objects by recursively reading and concatenating linked chunks.
-- Add `mdag ls` for listing direct children of a Tree.
-- Recompute CID after loading an object to detect object file tampering.
+提高功能：
 
-Out of scope:
+- 大于 1024 字节的文件编码为 List 对象，List 内部按顺序链接多个 Blob 分块。
+- 读取 List 对象时，按 Link 顺序递归读取并拼接数据。
+- 增加 `mdag ls`，用于列出 Tree 的直接子项。
+- `GetObject` 读取对象后重新计算 CID，用于检测对象文件是否被篡改。
 
-- Real IPFS networking, DHT, Bitswap, provider discovery, IPNS, or DNSLink.
-- Full CIDv0/CIDv1, multibase, multicodec, or multihash standards.
-- UnixFS protobuf, HAMT directories, concurrent download, cache layers, GUI, or HTTP gateway.
+不做的内容：
 
-## Project Structure
+- 真实 IPFS 网络、DHT、Bitswap、Provider Discovery、IPNS 或 DNSLink。
+- 完整 CIDv0/CIDv1、multibase、multicodec 或 multihash 标准。
+- UnixFS protobuf、HAMT-Sharded Directory、并发下载、缓存层、图形界面或 HTTP Gateway。
+
+## 项目结构
 
 ```text
 cmd/mdag/main.go
@@ -46,17 +48,17 @@ testdata/demo/
 README.md
 ```
 
-Responsibilities:
+各目录职责：
 
-- `object`: defines object types and deterministic JSON encoding/CID generation.
-- `store`: owns object persistence and integrity verification.
-- `importer`: converts local files/directories into Merkle DAG objects.
-- `resolver`: resolves Tree paths, reads Blob/List content, and lists Tree entries.
-- `cmd/mdag`: parses CLI commands and prints user-facing output.
+- `object`：定义对象类型，并实现确定性的 JSON 编码和 CID 生成。
+- `store`：负责对象持久化保存、读取和完整性复验。
+- `importer`：负责把本地文件或目录转换成 Merkle DAG 对象。
+- `resolver`：负责路径解析、文件读取和目录列出。
+- `cmd/mdag`：负责命令行参数解析和用户可见输出。
 
-## Object Model
+## 对象模型
 
-The project uses one unified object shape:
+项目使用一个统一的对象结构：
 
 ```go
 type ObjectType string
@@ -80,27 +82,27 @@ type Object struct {
 }
 ```
 
-Meaning:
+三种对象的含义：
 
-- Blob stores file bytes in `Data`.
-- Tree stores direct child entries in `Links`; each Link has a child name and CID.
-- List stores ordered chunk links in `Links`; Link names are optional because order matters more than names.
+- Blob：保存文件字节数据，内容放在 `Data` 字段中。
+- Tree：表示目录，`Links` 中保存当前目录的直接子项。每个 Link 包含子项名称和子对象 CID。
+- List：表示分块文件，`Links` 中按顺序保存多个 Blob 分块的 CID。List 的 Link 可以不需要名称，因为读取时主要依赖顺序。
 
-Tree links represent HashLinks from parent directories to child objects. List links represent HashLinks from a large file object to its chunk Blob objects.
+Tree 中的 Link 是从父目录对象指向子对象的 HashLink。List 中的 Link 是从一个大文件对象指向多个 Blob 分块的 HashLink。
 
-## CID And Encoding
+## CID 与序列化
 
-CID generation:
+CID 生成流程：
 
-1. Serialize the object to deterministic JSON.
-2. Compute SHA-256 over the serialized bytes.
-3. Encode the digest as a lowercase hexadecimal string.
+1. 将对象序列化为确定性的 JSON。
+2. 对序列化后的字节计算 SHA-256。
+3. 将哈希结果编码为小写十六进制字符串。
 
-Important rule: the same logical object must produce the same serialized bytes and the same CID. Tree links will be sorted by name before storing so that importing the same directory twice produces the same root CID.
+关键规则：同一个逻辑对象必须得到相同的序列化结果和相同的 CID。为了保证重复导入同一目录时根 CID 稳定，Tree 的 Links 会在保存前按名称排序。
 
-## Storage
+## 对象存储
 
-The `Store` interface:
+定义 `Store` 接口：
 
 ```go
 type Store interface {
@@ -109,81 +111,97 @@ type Store interface {
 }
 ```
 
-The file store writes each object as:
+文件存储会把每个对象保存为：
 
 ```text
 ./data/objects/<cid>.json
 ```
 
-`PutObject` computes the CID, creates the object directory if needed, and writes the serialized object. Re-saving the same object is allowed and should produce the same CID.
+`PutObject` 的流程：
 
-`GetObject` reads the JSON file, decodes the object, recomputes its CID, and checks that the recomputed CID matches the requested CID. If not, it returns an integrity error.
+1. 对对象进行序列化。
+2. 根据序列化结果计算 CID。
+3. 创建对象存储目录。
+4. 将 JSON 内容写入 `./data/objects/<cid>.json`。
+5. 返回 CID。
 
-## Import Flow
+同一个对象重复保存是允许的，并且应该得到同一个 CID。
 
-`AddPath(localPath, store)` returns the root CID for a file or directory.
+`GetObject` 的流程：
 
-For a directory:
+1. 根据 CID 找到对应 JSON 文件。
+2. 读取并反序列化为 Object。
+3. 对读出的对象重新计算 CID。
+4. 检查重新计算出的 CID 是否等于请求的 CID。
+5. 如果不一致，返回完整性错误。
 
-1. Read direct directory entries.
-2. Recursively call `AddPath` for each child.
-3. Create one Tree Link per child with child name, CID, and size when useful.
-4. Sort links by name.
-5. Save the Tree and return its CID.
+这样可以演示“CID 是内容指纹”：对象文件被手动修改后，它的内容和文件名中的 CID 就对不上了。
 
-For a file:
+## 导入流程
 
-1. If file size is less than or equal to 1024 bytes, read all bytes and save one Blob.
-2. If file size is greater than 1024 bytes, split it into 1024-byte chunks.
-3. Save each chunk as a Blob.
-4. Save a List object whose links point to the chunk CIDs in file order.
-5. Return the Blob CID or List CID.
+`AddPath(localPath, store)` 返回导入后的根 CID。
 
-This keeps the basic Blob case simple while making List visible in demonstrations.
+导入目录时：
 
-## Path Resolution
+1. 读取当前目录的直接子项。
+2. 对每个子项递归调用 `AddPath`。
+3. 为每个子项创建一个 Tree Link，记录子项名称、子对象 CID 和必要的大小信息。
+4. 按名称排序 Links，保证结果稳定。
+5. 保存 Tree 对象并返回它的 CID。
 
-`Resolve(rootCID, path, store)` returns the target CID and object type.
+导入文件时：
 
-Rules:
+1. 如果文件大小小于或等于 1024 字节，直接读取全部内容并保存为一个 Blob。
+2. 如果文件大小大于 1024 字节，将文件按 1024 字节切分。
+3. 每个分块保存为一个 Blob。
+4. 创建一个 List 对象，Links 按文件顺序指向这些 Blob 分块。
+5. 返回 Blob CID 或 List CID。
 
-- Empty path, `/`, and `.` refer to the root object.
-- A path such as `/docs/report.txt` is split into `docs` and `report.txt`.
-- Resolution starts from `rootCID`.
-- For each path component, the current object must be a Tree.
-- The resolver searches the Tree links for a matching `Name`.
-- If found, it moves to that child CID.
-- If not found, it returns a path-not-found error.
-- If a non-Tree object is reached before all components are consumed, it returns a not-a-directory error.
+这样既保留了基础版本中“文件就是 Blob”的简单理解，也可以展示 List 如何表示一个由多个 Blob 组成的大文件。
 
-Resolve does not expand List objects. It only locates the target object.
+## 路径解析
 
-## File Reading
+`Resolve(rootCID, path, store)` 返回目标对象的 CID 和类型。
 
-`ReadFile(rootCID, path, store)` uses `Resolve` first.
+解析规则：
 
-After resolving:
+- 空路径、`/` 和 `.` 都表示根对象。
+- `/docs/report.txt` 会被拆分为 `docs` 和 `report.txt` 两个路径片段。
+- 解析从 `rootCID` 对应的对象开始。
+- 每处理一个路径片段，当前对象都必须是 Tree。
+- Resolver 在当前 Tree 的 Links 中查找同名子项。
+- 如果找到，就移动到该子项 CID。
+- 如果找不到，就返回路径不存在错误。
+- 如果路径尚未解析完，但当前对象已经不是 Tree，就返回“当前对象不是目录”的错误。
 
-- If the target is Blob, return `Data`.
-- If the target is List, read every linked Blob/List in order and concatenate the bytes.
-- If the target is Tree, return a target-is-directory/not-file error.
+Resolve 不展开 List。Resolve 的职责只是定位目标对象，真正读取字节内容由 `cat` 或 `ReadFile` 完成。
 
-List reading can be implemented as a helper that reads by CID, so future nested Lists would work naturally even though the importer only creates one List level.
+## 文件读取
 
-## Directory Listing
+`ReadFile(rootCID, path, store)` 会先调用 Resolve 找到目标对象。
 
-`List(rootCID, path, store)` resolves the path and requires the target to be a Tree.
+解析完成后：
 
-For each direct Link:
+- 如果目标是 Blob，返回 `Data`。
+- 如果目标是 List，按 Link 顺序读取每个 Blob/List，并拼接字节。
+- 如果目标是 Tree，返回“目标不是文件”的错误。
 
-1. Load the linked object.
-2. Print its name, type, CID, and optional size.
+List 的读取可以实现成一个按 CID 读取内容的辅助函数。这样即使未来出现 List 嵌套 List，也能自然支持。当前 importer 只需要创建一层 List。
 
-This supports a useful demo command and helps explain Tree as a directory object.
+## 目录列出
 
-## CLI Design
+`List(rootCID, path, store)` 会先解析路径，并要求目标对象必须是 Tree。
 
-Commands:
+对 Tree 中的每个直接 Link：
+
+1. 加载 Link 指向的对象。
+2. 输出名称、对象类型、CID 和可选大小。
+
+这个命令可以帮助演示 Tree 就像一个目录表：它本身不存储子对象内容，只保存子对象的名称和 CID。
+
+## 命令行设计
+
+命令：
 
 ```text
 mdag add <local-path>
@@ -192,7 +210,7 @@ mdag cat <root-cid> <path>
 mdag ls <root-cid> <path>
 ```
 
-Output examples:
+输出示例：
 
 ```text
 $ mdag add ./testdata/demo
@@ -210,39 +228,39 @@ blob  report.txt  a13c...
 blob  notes.txt   b81e...
 ```
 
-The CLI should keep formatting plain and predictable because README examples and live demonstration matter more than visual polish.
+命令行输出保持简单、稳定、容易复制。这个项目的重点是 README 示例和现场演示，不需要复杂的终端界面。
 
-## Errors
+## 异常处理
 
-Use clear errors rather than panics.
+项目不需要复杂错误体系，但不能 panic 或无提示崩溃。
 
-Expected cases:
+需要处理的常见错误：
 
-- Object file does not exist for a CID.
-- Object JSON cannot be decoded.
-- Loaded object's recomputed CID does not match the requested CID.
-- A path component does not exist in a Tree.
-- Path traversal expects a Tree but reaches Blob or List.
-- `cat` target is a Tree.
-- `ls` target is not a Tree.
-- CLI arguments are missing or malformed.
+- CID 对应的对象文件不存在。
+- 对象 JSON 无法反序列化。
+- 读取对象后重新计算的 CID 与请求 CID 不一致。
+- Tree 中找不到某个路径片段。
+- 路径还没解析完，但当前对象已经是 Blob 或 List。
+- `cat` 的目标是 Tree。
+- `ls` 的目标不是 Tree。
+- CLI 参数缺失或格式不正确。
 
-## Tests
+## 测试设计
 
-Tests should cover the scoring-critical behavior:
+测试应覆盖评分中最关键的行为：
 
-- Same object produces same CID.
-- Different object content produces different CID.
-- Importing the same directory twice produces the same root CID.
-- Modifying a file changes the file object CID and ancestor Tree CID.
-- Resolving `/docs/report.txt` returns a file object.
-- Reading `/docs/report.txt` returns the original content.
-- Reading a file larger than 1024 bytes returns original content through List.
-- Resolving `/docs/missing.txt` returns a path-not-found error.
-- Calling `cat` on `/docs` returns a target-not-file error.
-- Tampering with an object file is detected by integrity verification.
+- 相同对象得到相同 CID。
+- 对象内容变化后得到不同 CID。
+- 同一目录重复导入两次，根 CID 相同。
+- 修改文件后重新导入，文件对象 CID 和祖先 Tree CID 都变化。
+- 解析 `/docs/report.txt` 能返回文件对象。
+- 读取 `/docs/report.txt` 能返回原始文件内容。
+- 读取大于 1024 字节的文件时，能通过 List 拼接还原原始内容。
+- 解析 `/docs/missing.txt` 返回路径不存在错误。
+- 对 `/docs` 执行 `cat` 返回目标不是文件错误。
+- 手动篡改对象文件后，`GetObject` 能检测到完整性错误。
 
-`testdata/demo` should include:
+`testdata/demo` 建议包含：
 
 ```text
 demo/
@@ -256,28 +274,39 @@ demo/
     └── large.txt
 ```
 
-`large.txt` should be larger than 1024 bytes to demonstrate List.
+其中 `large.txt` 应该大于 1024 字节，用来稳定演示 List。
 
-## Defense Explanation
+## 答辩解释要点
 
-The core explanation:
+核心解释：
 
-- CID is the content fingerprint of a serialized object.
-- Blob stores bytes.
-- Tree stores names and child CIDs, so it works like a directory.
-- List stores ordered child CIDs, so it works like a chunked large file.
-- HashLink means a parent does not embed the child object directly; it stores the child's CID.
-- A directory root CID identifies the whole imported directory because every child CID contributes to its parent Tree CID.
-- If a file changes, its Blob/List CID changes, then its parent Tree CID changes, and eventually the root CID changes.
-- Resolve only finds the target object; cat reads bytes from that object.
+- CID 是序列化对象内容的指纹。
+- Blob 保存文件字节。
+- Tree 保存名称和子对象 CID，所以它相当于目录。
+- List 保存有顺序的子对象 CID，所以它相当于一个分块大文件。
+- HashLink 的意思是父对象不直接嵌入子对象内容，而是保存子对象的 CID。
+- 一个目录的根 CID 可以代表整个目录，因为每个子对象 CID 都会影响父 Tree 的 CID，最终影响根 Tree 的 CID。
+- 如果某个文件内容变化，它的 Blob 或 List CID 会变化，父 Tree CID 也会变化，最后根 CID 也会变化。
+- Resolve 只负责定位目标对象；cat 才负责读取对象字节。
 
-## Implementation Order
+老师可能问：
 
-1. Initialize Go module and object package.
-2. Implement deterministic encoding and CID generation.
-3. Implement file-backed Store and integrity verification.
-4. Implement file/directory importer with Blob, Tree, and List.
-5. Implement Resolve, ReadFile, and List.
-6. Implement CLI commands.
-7. Add testdata, unit tests, and README examples.
-8. Run full verification and prepare defense notes.
+- 为什么相同文件导入两次 CID 一样？
+  - 因为对象序列化内容一样，SHA-256 的输入一样，所以 CID 一样。
+- 为什么修改一个文件后根 CID 也会变化？
+  - 因为文件对象 CID 变化，父目录 Tree 中保存的子 CID 变化，父 Tree 的序列化内容变化，CID 继续向上传播。
+- Tree 和 List 有什么区别？
+  - Tree 用名称查找子对象，表示目录；List 按顺序读取子对象，表示分块文件。
+- Resolve 和 cat 有什么区别？
+  - Resolve 找到目标对象 CID；cat 在 Resolve 的基础上读取 Blob 或 List 的字节内容。
+
+## 实现顺序
+
+1. 初始化 Go module 和 `object` 包。
+2. 实现对象结构、确定性编码和 CID 生成。
+3. 实现文件存储 Store 和完整性复验。
+4. 实现文件/目录 importer，支持 Blob、Tree 和 List。
+5. 实现 Resolve、ReadFile 和 List。
+6. 实现 CLI 命令。
+7. 添加 testdata、单元测试和 README 示例。
+8. 运行完整验证，并整理答辩说明。
