@@ -1,24 +1,83 @@
 # Merkle DAG 课程项目
 
-这是一个使用 Go 语言实现的简化版 Merkle DAG 文件存储与路径解析系统。
+本项目是一个使用 Go 语言实现的本地简化版 Merkle DAG 文件存储与路径解析系统。项目重点是演示内容寻址、CID、HashLink、Tree 路径解析和文件读取流程，不涉及真实 IPFS 网络、DHT、Bitswap、IPNS、UnixFS protobuf 等复杂功能。
 
-## 已完成功能
+## 一、功能完成情况
 
-- Blob：保存小文件内容。
-- Tree：保存目录的直接子项名称和子对象 CID。
-- List：将大于 1024 字节的文件切分为多个 Blob，并按顺序链接。
-- CID：使用 `hex(SHA256(JSON对象))` 生成内容标识。
-- 本地对象存储：对象保存到 `./data/objects/<cid>.json`。
-- 完整性复验：读取对象后重新计算 CID，检测对象文件是否被修改。
-- 命令行：支持 `add`、`resolve`、`cat`、`ls`。
+已实现基础功能：
 
-## 编译
+- Blob：保存普通小文件内容。
+- Tree：保存目录的直接子项，每个子项包含名称和子对象 CID。
+- CID：使用 `hex(SHA256(JSON对象))` 作为对象标识。
+- 对象存储：根据 CID 保存和读取对象。
+- 完整性复验：`GetObject` 读取对象后会重新计算 CID，检测对象文件是否被修改。
+- 目录导入：递归导入本地文件或目录。
+- 路径解析：从根 CID 出发，按路径逐层查找目标对象。
+- 文件读取：`cat` 可以输出目标文件内容。
+- 异常处理：支持 CID 不存在、路径不存在、路径中途遇到非 Tree、cat 目标不是文件等错误。
+
+已实现提高功能：
+
+- List：大于 1024 字节的文件会被切分为多个 Blob，并通过 List 按顺序链接。
+- 持久化存储：对象保存到本地 `data/objects/<cid>.json`。
+- `ls` 命令：列出 Tree 目录中的直接子项。
+
+## 二、项目结构
+
+```text
+cmd/mdag/main.go        命令行入口
+object/object.go        Blob、Tree、List、Link 等对象结构
+object/codec.go         JSON 序列化、反序列化和 CID 生成
+store/store.go          Store 接口
+store/file.go           文件持久化对象存储
+importer/importer.go    文件/目录递归导入，支持 List 分块
+resolver/resolver.go    路径解析、文件读取和目录列出
+testdata/demo/          可直接演示的测试目录
+```
+
+## 三、编译与测试
+
+编译：
 
 ```bash
 go build ./cmd/mdag
 ```
 
-## 运行示例
+运行全部测试：
+
+```bash
+go test ./...
+```
+
+测试覆盖了 CID 稳定性、对象存储、完整性复验、目录导入、List 分块、路径解析、文件读取和错误处理。
+
+## 四、命令说明
+
+导入文件或目录：
+
+```bash
+./mdag add <local-path>
+```
+
+解析路径：
+
+```bash
+./mdag resolve <root-cid> <path>
+```
+
+读取文件内容：
+
+```bash
+./mdag cat <root-cid> <path>
+```
+
+列出目录：
+
+```bash
+./mdag ls <root-cid> <path>
+```
+
+## 五、运行示例
 
 导入演示目录：
 
@@ -38,10 +97,23 @@ Root CID: <root-cid>
 ./mdag resolve <root-cid> /docs/report.txt
 ```
 
-读取文件：
+输出示例：
+
+```text
+Target CID: <target-cid>
+Type: blob
+```
+
+读取文件内容：
 
 ```bash
 ./mdag cat <root-cid> /docs/report.txt
+```
+
+输出示例：
+
+```text
+This is a report for the Merkle DAG course project.
 ```
 
 列出目录：
@@ -50,39 +122,97 @@ Root CID: <root-cid>
 ./mdag ls <root-cid> /docs
 ```
 
-演示 List：
+输出示例：
+
+```text
+blob    notes.txt    <cid>    41
+blob    report.txt   <cid>    52
+```
+
+演示 List 分块文件：
 
 ```bash
 ./mdag resolve <root-cid> /big/large.txt
-./mdag cat <root-cid> /big/large.txt
 ```
 
-`large.txt` 大于 1024 字节，导入后会被编码为 List，List 中的 Link 按顺序指向多个 Blob 分块。
+输出示例：
 
-## 核心原理
-
-CID 是对象内容的哈希指纹。同一个对象序列化结果相同，因此 CID 相同；对象内容发生变化，CID 也会变化。
-
-Blob 保存文件字节。Tree 表示目录，保存子项名称和子对象 CID。List 表示分块文件，按顺序保存多个 Blob 的 CID。
-
-HashLink 指父对象不直接嵌入子对象内容，而是保存子对象 CID。目录的根 CID 能代表整个目录，是因为每个子对象 CID 都会影响父 Tree 的 CID，并最终影响根 Tree 的 CID。
-
-Resolve 只负责根据路径找到目标对象 CID。Cat 会在 Resolve 的基础上读取 Blob 或 List 的字节内容。
-
-## 测试
-
-```bash
-go test ./...
+```text
+Target CID: <target-cid>
+Type: list
 ```
 
-## 答辩演示流程
+`testdata/demo/big/large.txt` 大于 1024 字节，因此导入时会被切分为多个 Blob，再由一个 List 对象按顺序链接这些 Blob。
 
-1. 运行 `./mdag add ./testdata/demo`，生成根 CID。
-2. 运行 `./mdag resolve <root-cid> /docs/report.txt`，展示路径解析。
-3. 运行 `./mdag cat <root-cid> /docs/report.txt`，展示文件读取。
-4. 运行 `./mdag resolve <root-cid> /big/large.txt`，展示 List 类型。
-5. 修改 `testdata/demo/docs/report.txt` 后重新 add，展示根 CID 变化。
+## 六、核心原理
 
-## 小组分工
+### 1. CID 如何生成
 
-如为个人完成，可写：本项目由本人独立完成，负责对象模型、CID 生成、对象存储、目录导入、路径解析、命令行和测试。
+对象会先被序列化为 JSON，然后对 JSON 字节计算 SHA-256，最后转成十六进制字符串作为 CID：
+
+```text
+CID = hex(SHA256(JSON(object)))
+```
+
+同一个对象的 JSON 内容相同，因此 CID 相同；对象内容发生变化时，JSON 内容变化，CID 也会变化。
+
+### 2. Blob、Tree、List 的区别
+
+- Blob 保存文件字节。
+- Tree 表示目录，保存子项名称和子对象 CID。
+- List 表示分块文件，按顺序保存多个 Blob 的 CID。
+
+### 3. HashLink 是什么
+
+HashLink 指父对象不直接保存子对象内容，而是保存子对象的 CID。
+
+例如目录 `Tree` 中的一个 Link 会保存：
+
+```text
+Name: report.txt
+CID:  <report.txt 对应 Blob 的 CID>
+```
+
+这样父 Tree 就通过 CID 指向子对象，形成 Merkle DAG。
+
+### 4. 为什么修改文件会导致根 CID 变化
+
+如果文件内容改变，文件对应的 Blob 或 List CID 会改变。父目录 Tree 中保存的子 CID 也会改变，因此父 Tree 的 CID 改变。这个变化会继续向上传播，最终导致根 Tree CID 改变。
+
+### 5. Resolve 和 Cat 的区别
+
+`resolve` 只负责从根 CID 和路径定位目标对象，返回目标 CID 和类型。
+
+`cat` 会先调用路径解析，再读取目标对象内容。如果目标是 Blob，直接返回 Data；如果目标是 List，按 Link 顺序读取所有分块并拼接；如果目标是 Tree，则返回“目标不是文件”的错误。
+
+## 七、答辩演示流程
+
+1. 编译项目：`go build ./cmd/mdag`
+2. 导入目录：`./mdag add ./testdata/demo`
+3. 解析文件：`./mdag resolve <root-cid> /docs/report.txt`
+4. 读取文件：`./mdag cat <root-cid> /docs/report.txt`
+5. 列出目录：`./mdag ls <root-cid> /docs`
+6. 演示 List：`./mdag resolve <root-cid> /big/large.txt`
+7. 修改 `testdata/demo/docs/report.txt` 后重新导入，观察根 CID 变化。
+
+## 八、常见问题回答
+
+问：List 的逻辑在哪里？
+
+答：导入大文件时，`importer.addChunkedFile` 会按 1024 字节切块，每块保存为 Blob，最后创建一个 `Type: list` 的对象保存这些 Blob 的 CID。读取时，`resolver.readObject` 遇到 List 会按 Links 顺序递归读取并拼接。
+
+问：持久化存储体现在哪里？
+
+答：在 `store.FileStore` 中。`PutObject` 会把对象保存到 `data/objects/<cid>.json`，`GetObject` 会根据 CID 读取对象文件，并重新计算 CID 做完整性复验。
+
+问：这个项目是不是完整 IPFS？
+
+答：不是。它只实现课程要求中的简化内容寻址文件系统，用来说明 CID、HashLink、Merkle DAG、Tree 路径解析和文件读取流程。
+
+## 九、小组分工
+
+如为个人完成，可写：
+
+```text
+本项目由本人独立完成，负责对象模型、CID 生成、对象存储、目录导入、路径解析、命令行、测试和 README 编写。
+```

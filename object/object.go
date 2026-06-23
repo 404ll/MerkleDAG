@@ -1,5 +1,6 @@
 package object
 
+// 定义对象类型
 type ObjectType string
 
 const (

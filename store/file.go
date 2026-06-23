@@ -10,7 +10,7 @@ import (
 )
 
 type FileStore struct {
-	dir string
+	dir string // 存储对象的目录
 }
 
 func NewFileStore(dir string) *FileStore {
@@ -26,9 +26,12 @@ func (s *FileStore) PutObject(obj object.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	//确保目录存在
 	if err := os.MkdirAll(s.dir, 0755); err != nil {
 		return "", err
 	}
+
+	//将对象写入文件
 	path := filepath.Join(s.dir, cid+".json")
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return "", err
@@ -38,7 +41,7 @@ func (s *FileStore) PutObject(obj object.Object) (string, error) {
 
 func (s *FileStore) GetObject(cid string) (object.Object, error) {
 	path := filepath.Join(s.dir, cid+".json")
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //读取文件
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return object.Object{}, fmt.Errorf("object not found: %s", cid)
@@ -46,14 +49,15 @@ func (s *FileStore) GetObject(cid string) (object.Object, error) {
 		return object.Object{}, err
 	}
 
-	obj, err := object.Decode(data)
+	obj, err := object.Decode(data) //反序列化
 	if err != nil {
 		return object.Object{}, fmt.Errorf("decode object %s: %w", cid, err)
 	}
-	actualCID, err := object.CID(obj)
+	actualCID, err := object.CID(obj) //计算对象的CID
 	if err != nil {
 		return object.Object{}, err
 	}
+	//通过对比验证文件是否被篡改
 	if actualCID != cid {
 		return object.Object{}, fmt.Errorf("integrity check failed: requested %s but content is %s", cid, actualCID)
 	}

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 )
 
+// 序列化
 func Encode(obj Object) ([]byte, error) {
 	return json.Marshal(obj)
 }
 
+// 反序列化
 func Decode(data []byte) (Object, error) {
 	var obj Object
 	if err := json.Unmarshal(data, &obj); err != nil {
@@ -18,6 +20,7 @@ func Decode(data []byte) (Object, error) {
 	return obj, nil
 }
 
+// 计算对象的CID
 func CID(obj Object) (string, error) {
 	data, err := Encode(obj)
 	if err != nil {

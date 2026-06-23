@@ -15,7 +15,7 @@ func TestCIDStableForSameObject(t *testing.T) {
 	}
 
 	if cid1 != cid2 {
-		t.Fatalf("same object should have same CID: %s != %s", cid1, cid2)
+		t.Fatalf("相同的对象应该得到相同的CID: %s != %s", cid1, cid2)
 	}
 }
 
@@ -33,7 +33,7 @@ func TestCIDChangesWhenContentChanges(t *testing.T) {
 	}
 
 	if cid1 == cid2 {
-		t.Fatalf("different objects should have different CIDs: %s", cid1)
+		t.Fatalf("不同的对象应该得到不同的CID: %s", cid1)
 	}
 }
 
@@ -56,6 +56,6 @@ func TestEncodeUsesDeterministicJSON(t *testing.T) {
 	}
 
 	if string(first) != string(second) {
-		t.Fatalf("encoding should be deterministic:\n%s\n%s", first, second)
+		t.Fatalf("序列化应该是确定的:\n%s\n%s", first, second)
 	}
 }
