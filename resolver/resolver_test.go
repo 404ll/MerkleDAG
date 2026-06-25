@@ -86,7 +86,7 @@ func TestResolveMissingPath(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected missing path error")
 	}
-	if !strings.Contains(err.Error(), "path not found") {
+	if !strings.Contains(err.Error(), "路径不存在") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -98,7 +98,7 @@ func TestReadFileRejectsTree(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected not file error")
 	}
-	if !strings.Contains(err.Error(), "target is not a file") {
+	if !strings.Contains(err.Error(), "目标不是文件") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

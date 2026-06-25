@@ -1,1 +1,1 @@
-Tree objects store names and child CIDs.
+Tree 对象保存子项名称和子对象 CID。

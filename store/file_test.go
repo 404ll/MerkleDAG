@@ -36,7 +36,7 @@ func TestFileStoreMissingCID(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing CID")
 	}
-	if !strings.Contains(err.Error(), "object not found") {
+	if !strings.Contains(err.Error(), "对象不存在") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -59,7 +59,7 @@ func TestFileStoreDetectsTampering(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected integrity error")
 	}
-	if !strings.Contains(err.Error(), "integrity check failed") {
+	if !strings.Contains(err.Error(), "完整性复验失败") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

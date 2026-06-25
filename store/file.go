@@ -44,14 +44,14 @@ func (s *FileStore) GetObject(cid string) (object.Object, error) {
 	data, err := os.ReadFile(path) //读取文件
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return object.Object{}, fmt.Errorf("object not found: %s", cid)
+			return object.Object{}, fmt.Errorf("对象不存在: %s", cid)
 		}
 		return object.Object{}, err
 	}
 
 	obj, err := object.Decode(data) //反序列化
 	if err != nil {
-		return object.Object{}, fmt.Errorf("decode object %s: %w", cid, err)
+		return object.Object{}, fmt.Errorf("反序列化对象 %s 失败: %w", cid, err)
 	}
 	actualCID, err := object.CID(obj) //计算对象的CID
 	if err != nil {
@@ -59,7 +59,7 @@ func (s *FileStore) GetObject(cid string) (object.Object, error) {
 	}
 	//通过对比验证文件是否被篡改
 	if actualCID != cid {
-		return object.Object{}, fmt.Errorf("integrity check failed: requested %s but content is %s", cid, actualCID)
+		return object.Object{}, fmt.Errorf("完整性复验失败: 请求 CID 为 %s，实际内容 CID 为 %s", cid, actualCID)
 	}
 	return obj, nil
 }

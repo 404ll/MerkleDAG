@@ -88,7 +88,7 @@ go test ./...
 输出示例：
 
 ```text
-Root CID: <root-cid>
+根 CID: <root-cid>
 ```
 
 解析两级路径：
@@ -100,8 +100,8 @@ Root CID: <root-cid>
 输出示例：
 
 ```text
-Target CID: <target-cid>
-Type: blob
+目标 CID: <target-cid>
+类型: Blob（文件）
 ```
 
 读取文件内容：
@@ -113,7 +113,7 @@ Type: blob
 输出示例：
 
 ```text
-This is a report for the Merkle DAG course project.
+这是 Merkle DAG 课程项目的报告文件。
 ```
 
 列出目录：
@@ -125,8 +125,8 @@ This is a report for the Merkle DAG course project.
 输出示例：
 
 ```text
-blob    notes.txt    <cid>    41
-blob    report.txt   <cid>    52
+Blob（文件）    notes.txt    <cid>    49
+Blob（文件）    report.txt   <cid>    49
 ```
 
 演示 List 分块文件：
@@ -138,8 +138,8 @@ blob    report.txt   <cid>    52
 输出示例：
 
 ```text
-Target CID: <target-cid>
-Type: list
+目标 CID: <target-cid>
+类型: List（分块文件）
 ```
 
 `testdata/demo/big/large.txt` 大于 1024 字节，因此导入时会被切分为多个 Blob，再由一个 List 对象按顺序链接这些 Blob。
@@ -211,8 +211,4 @@ CID:  <report.txt 对应 Blob 的 CID>
 
 ## 九、小组分工
 
-如为个人完成，可写：
-
-```text
 本项目由本人独立完成，负责对象模型、CID 生成、对象存储、目录导入、路径解析、命令行、测试和 README 编写。
-```

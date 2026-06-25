@@ -1,3 +1,3 @@
-# Demo Directory
+# 演示目录
 
-This directory is used to demonstrate the simplified Merkle DAG importer.
+这个目录用于演示简化版 Merkle DAG 导入、路径解析和文件读取流程。
