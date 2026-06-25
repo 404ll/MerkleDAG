@@ -195,20 +195,6 @@ CID:  <report.txt 对应 Blob 的 CID>
 6. 演示 List：`./mdag resolve <root-cid> /big/large.txt`
 7. 修改 `testdata/demo/docs/report.txt` 后重新导入，观察根 CID 变化。
 
-## 八、常见问题回答
-
-问：List 的逻辑在哪里？
-
-答：导入大文件时，`importer.addChunkedFile` 会按 1024 字节切块，每块保存为 Blob，最后创建一个 `Type: list` 的对象保存这些 Blob 的 CID。读取时，`resolver.readObject` 遇到 List 会按 Links 顺序递归读取并拼接。
-
-问：持久化存储体现在哪里？
-
-答：在 `store.FileStore` 中。`PutObject` 会把对象保存到 `data/objects/<cid>.json`，`GetObject` 会根据 CID 读取对象文件，并重新计算 CID 做完整性复验。
-
-问：这个项目是不是完整 IPFS？
-
-答：不是。它只实现课程要求中的简化内容寻址文件系统，用来说明 CID、HashLink、Merkle DAG、Tree 路径解析和文件读取流程。
-
-## 九、小组分工
+## 八、小组分工
 
 本项目由本人独立完成，负责对象模型、CID 生成、对象存储、目录导入、路径解析、命令行、测试和 README 编写。
