@@ -10,6 +10,7 @@ import (
 	"merkledag/store"
 )
 
+// 测试添加小文件时会直接创建 Blob 对象。
 func TestAddSmallFileCreatesBlob(t *testing.T) {
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "hello.txt")
@@ -28,13 +29,14 @@ func TestAddSmallFileCreatesBlob(t *testing.T) {
 	}
 
 	if obj.Type != object.BlobType {
-		t.Fatalf("expected blob, got %s", obj.Type)
+		t.Fatalf("应该生成 Blob 对象，实际为 %s", obj.Type)
 	}
 	if string(obj.Data) != "hello" {
-		t.Fatalf("unexpected data: %q", string(obj.Data))
+		t.Fatalf("文件内容不符合预期: %q", string(obj.Data))
 	}
 }
 
+// 测试添加大文件时会创建 List 对象记录所有分块。
 func TestAddLargeFileCreatesList(t *testing.T) {
 	dir := t.TempDir()
 	data := []byte(strings.Repeat("x", ChunkSize+20))
@@ -54,13 +56,14 @@ func TestAddLargeFileCreatesList(t *testing.T) {
 	}
 
 	if obj.Type != object.ListType {
-		t.Fatalf("expected list, got %s", obj.Type)
+		t.Fatalf("应该生成 List 对象，实际为 %s", obj.Type)
 	}
 	if len(obj.Links) != 2 {
-		t.Fatalf("expected 2 chunks, got %d", len(obj.Links))
+		t.Fatalf("应该生成 2 个分块，实际为 %d 个", len(obj.Links))
 	}
 }
 
+// 测试添加目录时会创建稳定的 Tree 对象，并按名称排序子链接。
 func TestAddDirectoryCreatesStableTree(t *testing.T) {
 	dir := t.TempDir()
 	demo := filepath.Join(dir, "demo")
@@ -85,19 +88,19 @@ func TestAddDirectoryCreatesStableTree(t *testing.T) {
 	}
 
 	if cid1 != cid2 {
-		t.Fatalf("same directory should produce same root CID: %s != %s", cid1, cid2)
+		t.Fatalf("同一目录应该生成相同的根 CID: %s != %s", cid1, cid2)
 	}
 	obj, err := st.GetObject(cid1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if obj.Type != object.TreeType {
-		t.Fatalf("expected tree, got %s", obj.Type)
+		t.Fatalf("应该生成 Tree 对象，实际为 %s", obj.Type)
 	}
 	if len(obj.Links) != 2 {
-		t.Fatalf("expected 2 direct children, got %d", len(obj.Links))
+		t.Fatalf("应该包含 2 个直接子项，实际为 %d 个", len(obj.Links))
 	}
 	if obj.Links[0].Name != "README.md" || obj.Links[1].Name != "docs" {
-		t.Fatalf("links should be sorted by name: %+v", obj.Links)
+		t.Fatalf("目录链接应该按名称排序: %+v", obj.Links)
 	}
 }

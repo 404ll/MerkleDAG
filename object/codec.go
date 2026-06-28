@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 )
 
-// 序列化
+// Encode 将对象序列化为 JSON 字节，作为持久化和 CID 计算的统一编码格式。
 func Encode(obj Object) ([]byte, error) {
 	return json.Marshal(obj)
 }
 
-// 反序列化
+// Decode 将 JSON 字节反序列化为对象。
 func Decode(data []byte) (Object, error) {
 	var obj Object
 	if err := json.Unmarshal(data, &obj); err != nil {
@@ -20,7 +20,7 @@ func Decode(data []byte) (Object, error) {
 	return obj, nil
 }
 
-// 计算对象的CID
+// CID 基于对象的规范 JSON 编码计算 SHA-256 内容标识。
 func CID(obj Object) (string, error) {
 	data, err := Encode(obj)
 	if err != nil {

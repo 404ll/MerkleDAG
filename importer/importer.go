@@ -10,9 +10,9 @@ import (
 	"merkledag/store"
 )
 
-// 将本地路径添加到Merkle DAG中，并返回根对象的CID
 const ChunkSize = 1024
 
+// AddPath 将本地文件或目录添加到 Merkle DAG 中，并返回根对象的 CID。
 func AddPath(localPath string, st store.Store) (string, error) {
 	info, err := os.Stat(localPath) // 读取本地文件或文件夹的元数据
 	if err != nil {
@@ -25,6 +25,7 @@ func AddPath(localPath string, st store.Store) (string, error) {
 	return addFile(localPath, info.Size(), st)
 }
 
+// addDirectory 递归导入目录内容，按名称排序链接后生成目录对象。
 func addDirectory(localPath string, st store.Store) (string, error) {
 	entries, err := os.ReadDir(localPath)
 	if err != nil {
@@ -59,6 +60,7 @@ func addDirectory(localPath string, st store.Store) (string, error) {
 	})
 }
 
+// addFile 根据文件大小决定直接存为 Blob，或拆成分块列表对象。
 func addFile(localPath string, size int64, st store.Store) (string, error) {
 	//判断是否需要分块处理
 	if size <= ChunkSize {
@@ -76,6 +78,7 @@ func addFile(localPath string, size int64, st store.Store) (string, error) {
 	return addChunkedFile(localPath, st)
 }
 
+// addChunkedFile 将大文件按固定大小分块，每块存为 Blob，再生成 List 对象串联这些块。
 func addChunkedFile(localPath string, st store.Store) (string, error) {
 	file, err := os.Open(localPath) //打开文件夹
 	if err != nil {

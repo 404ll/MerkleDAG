@@ -2,6 +2,7 @@ package object
 
 import "testing"
 
+// 测试相同对象会生成稳定一致的 CID。
 func TestCIDStableForSameObject(t *testing.T) {
 	obj := Object{Type: BlobType, Data: []byte("hello")}
 
@@ -19,6 +20,7 @@ func TestCIDStableForSameObject(t *testing.T) {
 	}
 }
 
+// 测试对象内容变化后 CID 会随之改变。
 func TestCIDChangesWhenContentChanges(t *testing.T) {
 	first := Object{Type: BlobType, Data: []byte("hello")}
 	second := Object{Type: BlobType, Data: []byte("hello!")}
@@ -37,6 +39,7 @@ func TestCIDChangesWhenContentChanges(t *testing.T) {
 	}
 }
 
+// 测试同一对象多次编码得到确定一致的 JSON。
 func TestEncodeUsesDeterministicJSON(t *testing.T) {
 	obj := Object{
 		Type: TreeType,

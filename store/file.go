@@ -13,10 +13,12 @@ type FileStore struct {
 	dir string // 存储对象的目录
 }
 
+// NewFileStore 创建一个基于本地目录的对象存储。
 func NewFileStore(dir string) *FileStore {
 	return &FileStore{dir: dir}
 }
 
+// PutObject 将对象编码后写入磁盘，并返回由对象内容计算出的 CID。
 func (s *FileStore) PutObject(obj object.Object) (string, error) {
 	cid, err := object.CID(obj)
 	if err != nil {
@@ -39,6 +41,7 @@ func (s *FileStore) PutObject(obj object.Object) (string, error) {
 	return cid, nil
 }
 
+// GetObject 按 CID 从磁盘读取对象，并重新计算 CID 校验内容完整性。
 func (s *FileStore) GetObject(cid string) (object.Object, error) {
 	path := filepath.Join(s.dir, cid+".json")
 	data, err := os.ReadFile(path) //读取文件

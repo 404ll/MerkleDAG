@@ -22,7 +22,7 @@ type Entry struct {
 	Size int64
 }
 
-// 从根 CID 出发解析路径
+// Resolve 从根 CID 出发解析路径，返回目标对象的 CID 和类型。
 func Resolve(rootCID, rawPath string, st store.Store) (Result, error) {
 	//统一规范化路径，确保以 / 开头，去除多余的 . 和 .. 等
 	cleaned := path.Clean("/" + strings.TrimPrefix(rawPath, "/"))
@@ -69,6 +69,7 @@ func Resolve(rootCID, rawPath string, st store.Store) (Result, error) {
 	return Result{CID: currentCID, Type: target.Type}, nil
 }
 
+// ReadFile 解析路径并读取目标文件内容，支持直接 Blob 和分块 List 文件。
 func ReadFile(rootCID, rawPath string, st store.Store) ([]byte, error) {
 	result, err := Resolve(rootCID, rawPath, st)
 	if err != nil {
@@ -77,6 +78,7 @@ func ReadFile(rootCID, rawPath string, st store.Store) ([]byte, error) {
 	return readObject(result.CID, st)
 }
 
+// readObject 按 CID 读取文件对象；List 会递归拼接所有分块内容。
 func readObject(cid string, st store.Store) ([]byte, error) {
 	obj, err := st.GetObject(cid)
 	if err != nil {
@@ -103,11 +105,14 @@ func readObject(cid string, st store.Store) ([]byte, error) {
 	}
 }
 
+// List 解析目录路径，并返回该目录下所有直接子项的名称、CID、类型和大小。
 func List(rootCID, rawPath string, st store.Store) ([]Entry, error) {
+	//判断路径是否存在并返回目标对象的 CID 和类型
 	result, err := Resolve(rootCID, rawPath, st)
 	if err != nil {
 		return nil, err
 	}
+	// 根据 CID 读取并反序列化目标对象
 	obj, err := st.GetObject(result.CID)
 	if err != nil {
 		return nil, err
@@ -116,6 +121,7 @@ func List(rootCID, rawPath string, st store.Store) ([]Entry, error) {
 		return nil, fmt.Errorf("目标不是目录: %s", result.CID)
 	}
 
+	//遍历目录对象的链接，获取每个子对象的详细信息
 	entries := make([]Entry, 0, len(obj.Links))
 	for _, link := range obj.Links {
 		child, err := st.GetObject(link.CID)
