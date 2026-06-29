@@ -40,6 +40,7 @@ func Resolve(rootCID, rawPath string, st store.Store) (Result, error) {
 	parts := strings.Split(strings.TrimPrefix(cleaned, "/"), "/")
 
 	for _, part := range parts {
+		//一层一层找
 		current, err := st.GetObject(currentCID)
 		if err != nil {
 			return Result{}, err

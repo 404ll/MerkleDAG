@@ -33,6 +33,7 @@ func addDirectory(localPath string, st store.Store) (string, error) {
 	}
 
 	links := make([]object.Link, 0, len(entries))
+	//按照路径遍历
 	for _, entry := range entries {
 		childPath := filepath.Join(localPath, entry.Name())
 		childInfo, err := os.Stat(childPath)
@@ -43,6 +44,7 @@ func addDirectory(localPath string, st store.Store) (string, error) {
 		if err != nil {
 			return "", err
 		}
+		//将子对象的链接信息添加到目录对象的链接列表中
 		links = append(links, object.Link{
 			Name: entry.Name(),
 			CID:  childCID,
