@@ -14,6 +14,7 @@
 - 目录导入：递归导入本地文件或目录。
 - 路径解析：从根 CID 出发，按路径逐层查找目标对象。
 - 文件读取：`cat` 可以输出目标文件内容。
+- DAG 可视化：`graph` 可以输出 DOT，或生成并打开 HTML 节点连线图。
 - 异常处理：支持 CID 不存在、路径不存在、路径中途遇到非 Tree、cat 目标不是文件等错误。
 
 已实现提高功能：
@@ -32,6 +33,7 @@ store/store.go          Store 接口
 store/file.go           文件持久化对象存储
 importer/importer.go    文件/目录递归导入，支持 List 分块
 resolver/resolver.go    路径解析、文件读取和目录列出
+graph/graph.go          DAG 关系遍历、DOT 输出和 HTML 图形渲染
 testdata/demo/          可直接演示的测试目录
 ```
 
@@ -49,7 +51,7 @@ go build ./cmd/mdag
 go test ./...
 ```
 
-测试覆盖了 CID 稳定性、对象存储、完整性复验、目录导入、List 分块、路径解析、文件读取和错误处理。
+测试覆盖了 CID 稳定性、对象存储、完整性复验、目录导入、List 分块、路径解析、文件读取、目录列出、DAG 可视化和错误处理。
 
 ## 四、命令说明
 
@@ -75,6 +77,19 @@ go test ./...
 
 ```bash
 ./mdag ls <root-cid> <path>
+```
+
+输出 DAG 图：
+
+```bash
+./mdag graph <root-cid> dot
+./mdag graph <root-cid> html
+```
+
+`dot` 会把 Graphviz DOT 文本输出到终端；`html` 会生成 `dag.html` 并自动打开浏览器。也可以指定 HTML 文件名：
+
+```bash
+./mdag graph <root-cid> html my-dag.html
 ```
 
 ## 五、运行示例
@@ -144,6 +159,33 @@ Blob（文件）    report.txt   <cid>    49
 
 `testdata/demo/big/large.txt` 大于 1024 字节，因此导入时会被切分为多个 Blob，再由一个 List 对象按顺序链接这些 Blob。
 
+生成并打开 DAG 可视化网页：
+
+```bash
+./mdag graph <root-cid> html
+```
+
+输出示例：
+
+```text
+已生成并打开: dag.html
+```
+
+网页中会用节点表示对象，用连线表示 `Tree.Links` 或 `List.Links`。Tree、List、Blob 会使用不同颜色展示，边上显示文件名或分块名称。
+
+输出 DOT 文本：
+
+```bash
+./mdag graph <root-cid> dot
+```
+
+如需用 Graphviz 渲染成图片，可以重定向到文件：
+
+```bash
+./mdag graph <root-cid> dot > dag.dot
+dot -Tpng dag.dot -o dag.png
+```
+
 ## 六、核心原理
 
 ### 1. CID 如何生成
@@ -185,6 +227,15 @@ CID:  <report.txt 对应 Blob 的 CID>
 
 `cat` 会先调用路径解析，再读取目标对象内容。如果目标是 Blob，直接返回 Data；如果目标是 List，按 Link 顺序读取所有分块并拼接；如果目标是 Tree，则返回“目标不是文件”的错误。
 
+### 6. DAG 可视化做了什么
+
+`graph` 会从根 CID 开始遍历对象，把所有对象记录为节点，把 `Tree` 和 `List` 中的 Link 记录为边。
+
+- DOT 输出适合交给 Graphviz 渲染。
+- HTML 输出会生成本地网页，用 SVG 画出节点连线图，并自动打开浏览器。
+- Tree 的边标签使用文件名或目录名。
+- List 的边标签使用分块名；如果 Link 没有名称，则显示为 `chunk-0`、`chunk-1` 等。
+
 ## 七、答辩演示流程
 
 1. 编译项目：`go build ./cmd/mdag`
@@ -193,7 +244,8 @@ CID:  <report.txt 对应 Blob 的 CID>
 4. 读取文件：`./mdag cat <root-cid> /docs/report.txt`
 5. 列出目录：`./mdag ls <root-cid> /docs`
 6. 演示 List：`./mdag resolve <root-cid> /big/large.txt`
-7. 修改 `testdata/demo/docs/report.txt` 后重新导入，观察根 CID 变化。
+7. 演示 DAG 可视化：`./mdag graph <root-cid> html`
+8. 修改 `testdata/demo/docs/report.txt` 后重新导入，观察根 CID 变化。
 
 ## 八、小组分工
 

@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 
+	"merkledag/graph"
 	"merkledag/importer"
 	"merkledag/object"
 	"merkledag/resolver"
@@ -12,6 +15,8 @@ import (
 )
 
 const defaultObjectDir = "data/objects"
+
+var openGraphHTML = openFile
 
 // main 是命令行入口，负责执行命令并将错误输出到标准错误。
 func main() {
@@ -73,6 +78,41 @@ func run(args []string) error {
 			fmt.Printf("%s\t%s\t%s\t%d\n", displayType(entry.Type), entry.Name, entry.CID, entry.Size)
 		}
 		return nil
+	case "graph":
+		if len(args) < 3 || len(args) > 4 {
+			return fmt.Errorf("用法: mdag graph <根CID> <dot|html> [输出HTML文件]")
+		}
+		switch args[2] {
+		case "dot":
+			if len(args) != 3 {
+				return fmt.Errorf("用法: mdag graph <根CID> dot")
+			}
+			out, err := graph.RenderDOT(args[1], st)
+			if err != nil {
+				return err
+			}
+			fmt.Print(out)
+			return nil
+		case "html":
+			outputPath := "dag.html"
+			if len(args) == 4 {
+				outputPath = args[3]
+			}
+			out, err := graph.RenderHTML(args[1], st)
+			if err != nil {
+				return err
+			}
+			if err := os.WriteFile(outputPath, []byte(out), 0644); err != nil {
+				return err
+			}
+			if err := openGraphHTML(outputPath); err != nil {
+				return fmt.Errorf("已生成 %s，但打开失败: %w", outputPath, err)
+			}
+			fmt.Println("已生成并打开:", outputPath)
+			return nil
+		default:
+			return fmt.Errorf("用法: mdag graph <根CID> <dot|html> [输出HTML文件]")
+		}
 	default:
 		return usage()
 	}
@@ -80,7 +120,18 @@ func run(args []string) error {
 
 // usage 返回命令行用法错误。
 func usage() error {
-	return fmt.Errorf("用法: mdag <add|resolve|cat|ls> [参数]")
+	return fmt.Errorf("用法: mdag <add|resolve|cat|ls|graph> [参数]")
+}
+
+func openFile(path string) error {
+	switch runtime.GOOS {
+	case "darwin":
+		return exec.Command("open", path).Start()
+	case "windows":
+		return exec.Command("rundll32", "url.dll,FileProtocolHandler", path).Start()
+	default:
+		return exec.Command("xdg-open", path).Start()
+	}
 }
 
 // displayType 将对象类型转换为适合命令行展示的中文名称。
